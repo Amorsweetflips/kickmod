@@ -6,8 +6,8 @@ from collections import defaultdict
 
 # CONFIGURATION
 KICK_CHANNEL = "sweetflips"
-KICK_EMAIL = "sweetflips2@outlook.com"       # <-- PUT your Kick email here
-KICK_PASSWORD = "TheHype01!"             # <-- PUT your Kick password here
+KICK_EMAIL = "your_email@example.com"
+KICK_PASSWORD = "yourpassword"
 DUPLICATE_THRESHOLD = 2
 DUPLICATE_TIME_WINDOW = 5  # seconds
 
@@ -15,7 +15,6 @@ user_messages = defaultdict(list)
 
 async def login_if_needed(page):
     try:
-        # Check if login form exists
         email_field = await page.query_selector('input[name="email"]')
         password_field = await page.query_selector('input[name="password"]')
 
@@ -33,9 +32,8 @@ async def login_if_needed(page):
             print("[+] Already logged in — skipping login.")
     except Exception as e:
         print(f"[Login Detection Error]: {e}")
-        pass
 
-async def run():
+async def run_bot():
     async with async_playwright() as p:
         print("[+] Launching Chromium browser...")
         browser = await p.chromium.launch(headless=True, timeout=10000)
@@ -44,21 +42,40 @@ async def run():
         context = await browser.new_context()
         page = await context.new_page()
 
-        # Step 1: Go to Kick login page
         print("[+] Going to Kick login page...")
         await page.goto("https://kick.com/login")
         print("[+] Kick login page opened!")
 
-        # Step 2: Perform login if needed
         await login_if_needed(page)
 
-        # Step 3: Navigate to sweetflips chatroom
         print("[+] Navigating to sweetflips chatroom...")
         await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
-        await page.wait_for_selector('textarea.chat-input', timeout=30000)
-        print(f"[+] Arrived at chatroom: {KICK_CHANNEL}")
+        await asyncio.sleep(5)
 
-        # Step 4: Begin monitoring chat for spammers
+        # Try to open chat if it's not visible yet
+        try:
+            chat_input = await page.query_selector('textarea.chat-input')
+            if not chat_input:
+                print("[!] Chat input not found — trying to open chat manually...")
+                open_chat_button = await page.query_selector('button:has-text("Join Chat")')
+                if not open_chat_button:
+                    open_chat_button = await page.query_selector('button:has-text("Expand Chat")')
+                if open_chat_button:
+                    await open_chat_button.click()
+                    print("[+] Clicked chat open button, waiting...")
+                    await asyncio.sleep(5)
+                else:
+                    print("[!] No chat open button found, maybe already in chat or chat restricted.")
+
+            await page.wait_for_selector('textarea.chat-input', timeout=30000)
+            print("[+] Chat input is ready!")
+
+        except Exception as e:
+            print(f"[Chat Opening Error]: {e}")
+            await asyncio.sleep(60)
+
+        print("[+] Bot is now monitoring the chat!")
+
         while True:
             try:
                 messages = await page.query_selector_all("div.chat-message")
@@ -69,7 +86,7 @@ async def run():
                             message_elem = await message.query_selector("div.message")
 
                             if not username_elem or not message_elem:
-                                continue  # If missing, skip
+                                continue
 
                             username = (await username_elem.inner_text()).strip()
                             text = (await message_elem.inner_text()).strip()
@@ -104,4 +121,12 @@ async def run():
                 print(f"[Outer Error]: {outer_error}")
                 await asyncio.sleep(5)
 
-asyncio.run(run())
+async def main():
+    while True:
+        try:
+            await run_bot()
+        except Exception as e:
+            print(f"[FATAL ERROR] Restarting bot in 10 seconds... Reason: {e}")
+            await asyncio.sleep(10)
+
+asyncio.run(main())
