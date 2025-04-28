@@ -1,5 +1,5 @@
 
-# SweetflipsBot Auto-Banner (Cookie Login Version) - FINAL
+# SweetflipsBot Auto-Banner (Cookie Login Version) - FINAL FLAT
 
 import time
 import json
