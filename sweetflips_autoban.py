@@ -22,8 +22,8 @@ async def run():
         # Step 1: Go to Kick login page
         print("[+] Going to Kick login page...")
         await page.goto("https://kick.com/login")
-        await page.wait_for_load_state('networkidle')
-        print("[+] Login page loaded!")
+        await page.wait_for_selector('input[name="email"]', timeout=30000)
+        print("[+] Login page loaded (email input found)!")
 
         # Step 2: Load cookies
         print("[+] Loading cookies...")
@@ -34,13 +34,13 @@ async def run():
         # Step 3: Refresh the page after loading cookies
         print("[+] Refreshing page with cookies...")
         await page.reload()
-        await page.wait_for_load_state('networkidle')
-        print("[+] Refreshed with cookies!")
+        await page.wait_for_selector('textarea.chat-input', timeout=30000)
+        print("[+] Refreshed and chat input ready!")
 
         # Step 4: Navigate to sweetflips chatroom
         print("[+] Navigating to sweetflips chatroom...")
         await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
-        await page.wait_for_load_state('networkidle')
+        await page.wait_for_selector('textarea.chat-input', timeout=30000)
         print(f"[+] Arrived at chatroom: {KICK_CHANNEL}")
 
         # Begin monitoring chat for spammers
