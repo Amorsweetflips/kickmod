@@ -1,7 +1,6 @@
-
 import os
 import subprocess
-import undetected_chromedriver.v2 as uc
+import undetected_chromedriver as uc
 
 def main():
     # Clean up old Xvfb lock if it exists
