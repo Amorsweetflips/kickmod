@@ -1,12 +1,24 @@
-FROM ghcr.io/puppeteer/puppeteer:latest
+FROM cimg/python:3.10-browsers
 
-# Install Python manually (Alpine base)
-RUN apt-get update && apt-get install -y python3 python3-pip
+# Install extra dependencies
+RUN sudo apt-get update && sudo apt-get install -y \
+    libnss3 \
+    libgconf-2-4 \
+    libxss1 \
+    libappindicator3-1 \
+    libasound2
 
+# Set environment variables for Chromium
+ENV CHROME_BIN="/usr/bin/google-chrome"
+ENV PATH="$CHROME_BIN:$PATH"
+
+# Install Python packages
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy bot code
 COPY . /app
 WORKDIR /app
 
-CMD ["python3", "sweetflips_autoban.py"]
+# Run the bot
+CMD ["python", "sweetflips_autoban.py"]
