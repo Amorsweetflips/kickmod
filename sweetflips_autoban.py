@@ -1,8 +1,7 @@
-
-# SweetflipsBot Auto-Banner (Chatroom Version) - FINAL LOGIN FIX
-# By Amor Munoz - Instant Ban Kick Spammers
+# SweetflipsBot Auto-Banner (Cookie Login Version)
 
 import time
+import json
 from collections import defaultdict
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -11,8 +10,6 @@ from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
 
 # CONFIGURATION
-KICK_USERNAME = "Sweetflipsbot"
-KICK_PASSWORD = "TheHype01!"
 KICK_CHANNEL = "sweetflips"
 DUPLICATE_THRESHOLD = 2
 DUPLICATE_TIME_WINDOW = 5  # seconds
@@ -28,25 +25,30 @@ options.binary_location = "/usr/bin/chromium"
 # Track messages
 user_messages = defaultdict(list)
 
-def login(driver):
-    driver.get("https://kick.com/login")
-    wait = WebDriverWait(driver, 15)
+def login_with_cookies(driver):
+    driver.get("https://kick.com/")
+    time.sleep(3)
 
-    email_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="email"]')))
-    password_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="password"]')))
+    with open("cookies.json", "r") as f:
+        cookies = json.load(f)
 
-    email_input.send_keys(KICK_USERNAME)
-    password_input.send_keys(KICK_PASSWORD)
+    for cookie in cookies:
+        cookie.pop('sameSite', None)  # Remove fields not accepted by Selenium
+        cookie.pop('storeId', None)
+        cookie.pop('id', None)
+        cookie.pop('hostOnly', None)
+        cookie.pop('session', None)
 
-    login_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(), "Log In")]')))
-    login_button.click()
-    print("[+] Logged in successfully.")
+        driver.add_cookie(cookie)
+
+    driver.refresh()
+    print("[+] Loaded cookies successfully and refreshed!")
     time.sleep(5)
 
 def navigate_to_chatroom(driver):
     driver.get(f"https://kick.com/{KICK_CHANNEL}/chatroom")
+    print(f"[+] Navigated to chatroom: {KICK_CHANNEL}")
     time.sleep(5)
-    print(f"[+] Navigated to chatroom: {KICK_CHANNEL}/chatroom")
 
 def detect_and_ban(driver):
     while True:
@@ -89,7 +91,7 @@ def detect_and_ban(driver):
 
 def main():
     driver = uc.Chrome(options=options)
-    login(driver)
+    login_with_cookies(driver)
     navigate_to_chatroom(driver)
     detect_and_ban(driver)
 
