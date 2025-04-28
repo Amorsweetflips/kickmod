@@ -1,4 +1,5 @@
-# SweetflipsBot Auto-Banner (Cookie Login Version)
+
+# SweetflipsBot Auto-Banner (Cookie Login Version) - FINAL
 
 import time
 import json
@@ -28,17 +29,10 @@ user_messages = defaultdict(list)
 def login_with_cookies(driver):
     driver.get("https://kick.com/")
     time.sleep(3)
-
     with open("cookies.json", "r") as f:
         cookies = json.load(f)
 
     for cookie in cookies:
-        cookie.pop('sameSite', None)  # Remove fields not accepted by Selenium
-        cookie.pop('storeId', None)
-        cookie.pop('id', None)
-        cookie.pop('hostOnly', None)
-        cookie.pop('session', None)
-
         driver.add_cookie(cookie)
 
     driver.refresh()
