@@ -1,97 +1,65 @@
-import os
-import subprocess
-import time
+import asyncio
+from playwright.async_api import async_playwright
 import json
+import time
 from collections import defaultdict
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import undetected_chromedriver as uc
 
-# CONFIGURATION
 KICK_CHANNEL = "sweetflips"
 DUPLICATE_THRESHOLD = 2
 DUPLICATE_TIME_WINDOW = 5  # seconds
 
-# Xvfb Setup
-if os.path.exists('/tmp/.X99-lock'):
-    os.remove('/tmp/.X99-lock')
-subprocess.Popen(['Xvfb', ':99', '-screen', '0', '1024x768x24'])
-os.environ["DISPLAY"] = ":99"
-
-# Selenium Setup
-options = uc.ChromeOptions()
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_argument("--headless=new")
-
-# Track messages
 user_messages = defaultdict(list)
 
-def login_with_cookies(driver):
-    driver.get("https://kick.com/")
-    time.sleep(3)
-    with open("cookies.json", "r") as f:
-        cookies = json.load(f)
+async def run():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
 
-    for cookie in cookies:
-        driver.add_cookie(cookie)
+        # Load cookies
+        with open('cookies.json', 'r') as f:
+            cookies = json.load(f)
+        await context.add_cookies(cookies)
 
-    driver.refresh()
-    print("[+] Loaded cookies successfully and refreshed!")
-    time.sleep(5)
+        page = await context.new_page()
+        await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
+        print(f"[+] Navigated to chatroom: {KICK_CHANNEL}")
 
-def navigate_to_chatroom(driver):
-    driver.get(f"https://kick.com/{KICK_CHANNEL}/chatroom")
-    print(f"[+] Navigated to chatroom: {KICK_CHANNEL}")
-    time.sleep(5)
+        while True:
+            try:
+                messages = await page.query_selector_all("div.chat-message")
+                for message in messages[-10:]:
+                    try:
+                        username_elem = await message.query_selector("a.username")
+                        message_elem = await message.query_selector("div.message")
+                        username = (await username_elem.inner_text()).strip()
+                        text = (await message_elem.inner_text()).strip()
+                        now = time.time()
 
-def detect_and_ban(driver):
-    while True:
-        try:
-            messages = driver.find_elements(By.CSS_SELECTOR, "div.chat-message")
-            for message in messages[-10:]:
-                try:
-                    username_elem = message.find_element(By.CSS_SELECTOR, "a.username")
-                    message_elem = message.find_element(By.CSS_SELECTOR, "div.message")
-                    username = username_elem.text.strip()
-                    text = message_elem.text.strip()
-                    now = time.time()
+                        user_messages[username].append((text, now))
+                        user_messages[username] = [
+                            (msg, ts) for msg, ts in user_messages[username]
+                            if now - ts <= DUPLICATE_TIME_WINDOW
+                        ]
 
-                    user_messages[username].append((text, now))
-                    user_messages[username] = [
-                        (msg, ts) for msg, ts in user_messages[username]
-                        if now - ts <= DUPLICATE_TIME_WINDOW
-                    ]
+                        messages_text = [msg for msg, ts in user_messages[username]]
+                        most_common = max(set(messages_text), key=messages_text.count)
+                        count = messages_text.count(most_common)
 
-                    messages_text = [msg for msg, ts in user_messages[username]]
-                    most_common = max(set(messages_text), key=messages_text.count)
-                    count = messages_text.count(most_common)
+                        if count >= DUPLICATE_THRESHOLD:
+                            print(f"[SPAM DETECTED] Banning user: {username}")
+                            chatbox = await page.query_selector("textarea.chat-input")
+                            await chatbox.fill(f"/ban {username}")
+                            await chatbox.press("Enter")
+                            user_messages[username] = []
+                            await asyncio.sleep(2)
 
-                    if count >= DUPLICATE_THRESHOLD:
-                        print(f"[SPAM DETECTED] Banning user: {username}")
-                        chatbox = driver.find_element(By.CSS_SELECTOR, "textarea.chat-input")
-                        chatbox.send_keys(f"/ban {username}")
-                        chatbox.send_keys(Keys.ENTER)
-                        user_messages[username] = []  # Clear after banning
-                        time.sleep(2)
+                    except Exception:
+                        continue
 
-                except Exception:
-                    continue
+                await asyncio.sleep(2)
 
-            time.sleep(2)
+            except Exception as e:
+                print(f"[ERROR]: {e}")
+                await asyncio.sleep(5)
 
-        except Exception as e:
-            print(f"[ERROR]: {e}")
-            time.sleep(5)
-
-def main():
-    driver = uc.Chrome(options=options)
-    login_with_cookies(driver)
-    navigate_to_chatroom(driver)
-    detect_and_ban(driver)
-
-if __name__ == "__main__":
-    main()
+asyncio.run(run())
