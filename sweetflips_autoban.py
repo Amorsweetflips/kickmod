@@ -4,11 +4,36 @@ import json
 import time
 from collections import defaultdict
 
+# CONFIGURATION
 KICK_CHANNEL = "sweetflips"
+KICK_EMAIL = "sweetflips2@outlook.com"       # <-- PUT your Kick email here
+KICK_PASSWORD = "TheHype01!"             # <-- PUT your Kick password here
 DUPLICATE_THRESHOLD = 2
 DUPLICATE_TIME_WINDOW = 5  # seconds
 
 user_messages = defaultdict(list)
+
+async def login_if_needed(page):
+    try:
+        # Check if login form exists
+        email_field = await page.query_selector('input[name="email"]')
+        password_field = await page.query_selector('input[name="password"]')
+
+        if email_field and password_field:
+            print("[+] Login form detected, logging in automatically...")
+            await email_field.fill(KICK_EMAIL)
+            await password_field.fill(KICK_PASSWORD)
+
+            login_button = await page.query_selector('button[type="submit"]')
+            if login_button:
+                await login_button.click()
+                await page.wait_for_selector('header', timeout=30000)
+                print("[+] Logged in successfully!")
+        else:
+            print("[+] Already logged in — skipping login.")
+    except Exception as e:
+        print(f"[Login Detection Error]: {e}")
+        pass
 
 async def run():
     async with async_playwright() as p:
@@ -24,25 +49,16 @@ async def run():
         await page.goto("https://kick.com/login")
         print("[+] Kick login page opened!")
 
-        # Step 2: Load cookies
-        print("[+] Loading cookies...")
-        with open('cookies.json', 'r') as f:
-            cookies = json.load(f)
-        await context.add_cookies(cookies)
+        # Step 2: Perform login if needed
+        await login_if_needed(page)
 
-        # Step 3: Refresh the page after loading cookies
-        print("[+] Refreshing page with cookies...")
-        await page.reload()
-        await page.wait_for_selector('header', timeout=30000)
-        print("[+] Refreshed and header found!")
-
-        # Step 4: Navigate to sweetflips chatroom
+        # Step 3: Navigate to sweetflips chatroom
         print("[+] Navigating to sweetflips chatroom...")
         await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
         await page.wait_for_selector('textarea.chat-input', timeout=30000)
         print(f"[+] Arrived at chatroom: {KICK_CHANNEL}")
 
-        # Step 5: Begin monitoring chat for spammers
+        # Step 4: Begin monitoring chat for spammers
         while True:
             try:
                 messages = await page.query_selector_all("div.chat-message")
@@ -53,7 +69,7 @@ async def run():
                             message_elem = await message.query_selector("div.message")
 
                             if not username_elem or not message_elem:
-                                continue  # If one is missing, skip safely
+                                continue  # If missing, skip
 
                             username = (await username_elem.inner_text()).strip()
                             text = (await message_elem.inner_text()).strip()
