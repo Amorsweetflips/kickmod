@@ -1,10 +1,9 @@
 
-# SweetflipsBot Auto-Banner (Chatroom Version)
+# SweetflipsBot Auto-Banner (Chatroom Version) - FINAL FIXED
 # By Amor Munoz - Instant Ban Kick Spammers
 
 import time
 from collections import defaultdict
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 import undetected_chromedriver as uc
@@ -21,6 +20,8 @@ options = uc.ChromeOptions()
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--headless=new")
+options.binary_location = "/usr/bin/chromium"
 
 # Track messages
 user_messages = defaultdict(list)
