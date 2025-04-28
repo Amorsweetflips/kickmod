@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright/python:v1.43.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.51.0-jammy
 
 # Set workdir
 WORKDIR /app
@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy project files
 COPY . /app
 
-# Install Python libraries (if needed)
+# Install Python libraries
 RUN pip install -r requirements.txt
 
 # Run the script
