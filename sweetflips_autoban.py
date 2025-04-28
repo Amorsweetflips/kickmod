@@ -1,11 +1,13 @@
 
-# SweetflipsBot Auto-Banner (Chatroom Version) - FINAL FIXED
+# SweetflipsBot Auto-Banner (Chatroom Version) - FINAL LOGIN FIX
 # By Amor Munoz - Instant Ban Kick Spammers
 
 import time
 from collections import defaultdict
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
 
 # CONFIGURATION
@@ -28,12 +30,18 @@ user_messages = defaultdict(list)
 
 def login(driver):
     driver.get("https://kick.com/login")
-    time.sleep(2)
-    driver.find_element(By.NAME, "email").send_keys(KICK_USERNAME)
-    driver.find_element(By.NAME, "password").send_keys(KICK_PASSWORD)
-    driver.find_element(By.XPATH, "//button[contains(text(), 'Log In')]").click()
-    time.sleep(5)
+    wait = WebDriverWait(driver, 15)
+
+    email_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="email"]')))
+    password_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="password"]')))
+
+    email_input.send_keys(KICK_USERNAME)
+    password_input.send_keys(KICK_PASSWORD)
+
+    login_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(), "Log In")]')))
+    login_button.click()
     print("[+] Logged in successfully.")
+    time.sleep(5)
 
 def navigate_to_chatroom(driver):
     driver.get(f"https://kick.com/{KICK_CHANNEL}/chatroom")
