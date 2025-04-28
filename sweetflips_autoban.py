@@ -46,39 +46,46 @@ async def run():
         while True:
             try:
                 messages = await page.query_selector_all("div.chat-message")
-                for message in messages[-10:]:
-                    try:
-                        username_elem = await message.query_selector("a.username")
-                        message_elem = await message.query_selector("div.message")
-                        username = (await username_elem.inner_text()).strip()
-                        text = (await message_elem.inner_text()).strip()
-                        now = time.time()
+                if messages:
+                    for message in messages[-10:]:
+                        try:
+                            username_elem = await message.query_selector("a.username")
+                            message_elem = await message.query_selector("div.message")
 
-                        user_messages[username].append((text, now))
-                        user_messages[username] = [
-                            (msg, ts) for msg, ts in user_messages[username]
-                            if now - ts <= DUPLICATE_TIME_WINDOW
-                        ]
+                            if not username_elem or not message_elem:
+                                continue  # If one is missing, skip safely
 
-                        messages_text = [msg for msg, ts in user_messages[username]]
-                        most_common = max(set(messages_text), key=messages_text.count)
-                        count = messages_text.count(most_common)
+                            username = (await username_elem.inner_text()).strip()
+                            text = (await message_elem.inner_text()).strip()
+                            now = time.time()
 
-                        if count >= DUPLICATE_THRESHOLD:
-                            print(f"[SPAM DETECTED] Banning user: {username}")
-                            chatbox = await page.query_selector("textarea.chat-input")
-                            await chatbox.fill(f"/ban {username}")
-                            await chatbox.press("Enter")
-                            user_messages[username] = []
-                            await asyncio.sleep(2)
+                            user_messages[username].append((text, now))
+                            user_messages[username] = [
+                                (msg, ts) for msg, ts in user_messages[username]
+                                if now - ts <= DUPLICATE_TIME_WINDOW
+                            ]
 
-                    except Exception:
-                        continue
+                            messages_text = [msg for msg, ts in user_messages[username]]
+                            most_common = max(set(messages_text), key=messages_text.count)
+                            count = messages_text.count(most_common)
+
+                            if count >= DUPLICATE_THRESHOLD:
+                                print(f"[SPAM DETECTED] Banning user: {username}")
+                                chatbox = await page.query_selector("textarea.chat-input")
+                                if chatbox:
+                                    await chatbox.fill(f"/ban {username}")
+                                    await chatbox.press("Enter")
+                                    user_messages[username] = []
+                                    await asyncio.sleep(2)
+
+                        except Exception as inner_error:
+                            print(f"[Inner Error]: {inner_error}")
+                            continue
 
                 await asyncio.sleep(2)
 
-            except Exception as e:
-                print(f"[ERROR]: {e}")
+            except Exception as outer_error:
+                print(f"[Outer Error]: {outer_error}")
                 await asyncio.sleep(5)
 
 asyncio.run(run())
