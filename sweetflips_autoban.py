@@ -12,18 +12,38 @@ user_messages = defaultdict(list)
 
 async def run():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
+        print("[+] Launching Chromium browser...")
+        browser = await p.chromium.launch(headless=True, timeout=10000)
+        print("[+] Browser launched!")
 
-        # Load cookies
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        # Step 1: Go to Kick login page
+        print("[+] Going to Kick login page...")
+        await page.goto("https://kick.com/login")
+        await page.wait_for_load_state('networkidle')
+        print("[+] Login page loaded!")
+
+        # Step 2: Load cookies
+        print("[+] Loading cookies...")
         with open('cookies.json', 'r') as f:
             cookies = json.load(f)
         await context.add_cookies(cookies)
 
-        page = await context.new_page()
-        await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
-        print(f"[+] Navigated to chatroom: {KICK_CHANNEL}")
+        # Step 3: Refresh the page after loading cookies
+        print("[+] Refreshing page with cookies...")
+        await page.reload()
+        await page.wait_for_load_state('networkidle')
+        print("[+] Refreshed with cookies!")
 
+        # Step 4: Navigate to sweetflips chatroom
+        print("[+] Navigating to sweetflips chatroom...")
+        await page.goto(f"https://kick.com/{KICK_CHANNEL}/chatroom")
+        await page.wait_for_load_state('networkidle')
+        print(f"[+] Arrived at chatroom: {KICK_CHANNEL}")
+
+        # Begin monitoring chat for spammers
         while True:
             try:
                 messages = await page.query_selector_all("div.chat-message")
