@@ -1,18 +1,18 @@
-# 1. Base image
-FROM node:18-alpine
+FROM node:18-slim
 
-# 2. Create app dir
 WORKDIR /usr/src/app
 
-# 3. Copy package files & install deps
+# install Chromium deps
+RUN apt-get update && apt-get install -y \
+    gconf-service libasound2 libatk1.0-0 libcups2 libx11-xcb1 \
+    libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 \
+    libpangocairo-1.0-0 libpango1.0-0 libnss3 libxss1 libxtst6 \
+    fonts-liberation libappindicator3-1 xdg-utils --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 RUN npm install --production
 
-# 4. Copy all your bot code in
 COPY . .
 
-# 5. Expose if needed (you probably don’t)
-# EXPOSE 8080
-
-# 6. Kick-off with the correct entrypoint
 CMD ["node", "kick-puppeteer-bot.js"]
