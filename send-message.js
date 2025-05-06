@@ -1,100 +1,38 @@
-import fs from 'fs/promises';
-import path from 'path';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import axios from 'axios';
-import dotenv from 'dotenv';
-
-dotenv.config();
-puppeteer.use(StealthPlugin());
-
-const argv = yargs(hideBin(process.argv))
-  .option('headful', {
-    type: 'boolean',
-    default: false,
-    describe: 'Run with visible browser window'
-  })
-  .parse();
-
-const CHANNEL_SLUG = process.env.CHANNEL_SLUG;
-if (!CHANNEL_SLUG) {
-  console.error('🔴  You must set CHANNEL_SLUG in your .env');
-  process.exit(1);
-}
-
-const COOKIES_PATH = path.resolve(process.cwd(), 'cookies.json');
-
-async function loadOrLogin(page) {
-  try {
-    const raw = await fs.readFile(COOKIES_PATH, 'utf8');
-    const cookies = JSON.parse(raw);
-    await page.setCookie(...cookies);
-    console.log('🔒 Loaded cookies');
-  } catch {
-    console.log('🔐 No cookies found; please log in manually.');
-    await page.goto(`https://kick.com/${CHANNEL_SLUG}`, { waitUntil: 'networkidle2' });
-    console.log('▶️  After solving Cloudflare / login, press ENTER');
-    await new Promise(r => process.stdin.once('data', r));
-    const cookies = await page.cookies();
-    await fs.writeFile(COOKIES_PATH, JSON.stringify(cookies, null, 2));
-    console.log(`💾 Cookies saved to ${COOKIES_PATH}`);
-  }
-}
-
-async function getChannelId(page) {
-  // 1) Try meta tag
-  try {
-    await page.waitForSelector('meta[property="kick:channel_id"]', { timeout: 10_000 });
-    const id = await page.$eval('meta[property="kick:channel_id"]', el => el.content);
-    if (id) return id;
-  } catch {}
-
-  // 2) Fallback to Next.js page data
-  await page.waitForSelector('script#__NEXT_DATA__', { timeout: 10_000 });
-  const raw = await page.$eval('script#__NEXT_DATA__', el => el.textContent);
-  const data = JSON.parse(raw);
-  // adjust these paths if Kick changes their schema
-  const possible =
-    data?.props?.pageProps?.channel?.id ||
-    data?.props?.initialState?.channel?.id ||
-    data?.props?.pageProps?.channel?.channel_id;
-  if (possible) return possible;
-
-  throw new Error('Channel ID not found on page');
-}
-
-async function sendMessage(channelId, message) {
-  const url = `https://kick.com/api/v1/channels/${channelId}/message`;
-  const res = await axios.post(
-    url,
-    { content: message },
-    { withCredentials: true }
-  );
-  if (res.status !== 200) throw new Error(`send failed: ${res.status}`);
-}
+import puppeteer from 'puppeteer';
 
 (async () => {
-  const browser = await puppeteer.launch({
-    headless: !argv.headful,
-    defaultViewport: null
-  });
-  const page = await browser.newPage();
+  console.log('🟢 Bot starting…');
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ]
+    });
+    const page = await browser.newPage();
 
-  await loadOrLogin(page);
-  await page.goto(`https://kick.com/${CHANNEL_SLUG}`, { waitUntil: 'networkidle2' });
+    console.log('🔵 Logging in…');
+    await page.goto('https://kick.com/login', { waitUntil: 'networkidle2' });
+    await page.type('input[name="login"]', process.env.KICK_USER, { delay: 50 });
+    await page.type('input[name="password"]', process.env.KICK_PASS, { delay: 50 });
+    await page.click('button[type="submit"]');
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    console.log('✅ Logged in as', process.env.KICK_USER);
 
-  const channelId = await getChannelId(page);
-  console.log(`✅  Channel ID = ${channelId}`);
+    const chatUrl = process.env.KICK_CHAT_URL || 'https://kick.com/sweetflips';
+    console.log('🔵 Navigating to chat:', chatUrl);
+    await page.goto(chatUrl, { waitUntil: 'networkidle2' });
 
-  // example: send a message every 5 seconds
-  setInterval(async () => {
-    try {
-      await sendMessage(channelId, 'Whats up happy people !!');
-      console.log('📨 sent “Whats up happy people !!”');
-    } catch (e) {
-      console.error('✖ send error:', e.message);
-    }
-  }, 5_000);
+    await page.waitForSelector('.chat-message', { timeout: 30000 });
+    await page.screenshot({ path: 'debug_screenshot.png' });
+    console.log('✅ Screenshot taken: debug_screenshot.png');
+
+    await browser.close();
+    console.log('🟢 Bot finished successfully');
+  } catch (err) {
+    console.error('🔴 Crash:', err);
+    process.exit(1);
+  }
 })();
