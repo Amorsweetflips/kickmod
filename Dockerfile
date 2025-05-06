@@ -1,8 +1,18 @@
-FROM mcr.microsoft.com/playwright/python:v1.51.0-jammy
+# 1. Base image
+FROM node:18-alpine
 
-WORKDIR /app
-COPY . /app
+# 2. Create app dir
+WORKDIR /usr/src/app
 
-RUN pip install --no-cache-dir -r requirements.txt
+# 3. Copy package files & install deps
+COPY package*.json ./
+RUN npm install --production
 
-CMD ["python", "sweetflips_autoban.py"]
+# 4. Copy all your bot code in
+COPY . .
+
+# 5. Expose if needed (you probably don’t)
+# EXPOSE 8080
+
+# 6. Kick-off with the correct entrypoint
+CMD ["node", "kick-puppeteer-bot.js"]
